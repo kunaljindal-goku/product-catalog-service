@@ -17,4 +17,4 @@ jobs:
           java-version: '17'
           cache: maven
       - name: Run the tests that need no database (the two tests that need MySQL are skipped)
-        run: mvn -B test -Dtest='!ProductCatalogServiceApplicationTests,!ProductSearchIntegrationTest'
+        run: mvn -B test -Dtest='!ProductCatalogServiceApplicationTests,!ProductSearchIntegrationTests'
