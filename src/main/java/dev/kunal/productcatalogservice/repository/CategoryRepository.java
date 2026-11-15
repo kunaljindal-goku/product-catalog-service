@@ -1,0 +1,21 @@
+package dev.kunal.productcatalogservice.repository;
+
+import dev.kunal.productcatalogservice.model.Category;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+import java.beans.JavaBean;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface CategoryRepository extends JpaRepository<Category,UUID> {
+    Optional<Category> findByName(String name);
+
+    @Query(value = "SELECT AVG(p.price) from Product p where p.category.name=:categoryName")
+    Double findAvgPriceForCategory(String categoryName);
+
+//    @Query(value = "SELECT avg(p.price) from product p JOIN catgegory c " +
+//            "ON p.category_id = c.id " +
+//            "where c.name=:categoryName",nativeQuery = true)
+//    Double findAvgPriceForCategory(String categoryName);
+}

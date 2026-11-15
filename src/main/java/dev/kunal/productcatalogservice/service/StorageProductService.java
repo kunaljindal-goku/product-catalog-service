@@ -1,0 +1,120 @@
+package dev.kunal.productcatalogservice.service;
+
+import dev.kunal.productcatalogservice.dto.ProductDto;
+import dev.kunal.productcatalogservice.mappers.ProductMapper;
+import dev.kunal.productcatalogservice.model.Category;
+import dev.kunal.productcatalogservice.model.Product;
+import dev.kunal.productcatalogservice.model.enums.State;
+import dev.kunal.productcatalogservice.repository.CategoryRepository;
+import dev.kunal.productcatalogservice.repository.ProductRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+@Primary
+@Slf4j
+@RequiredArgsConstructor
+public class StorageProductService implements IProductService{
+
+    private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepo;
+    private final ProductMapper productMapper;
+
+//    public StorageProductService(ProductRepository productRepository,
+//                                 CategoryRepository categoryRepo,
+//                                 ProductMapper productMapper) {
+//        this.productRepository = productRepository;
+//        this.categoryRepo = categoryRepo;
+//        this.productMapper = productMapper;
+//    }
+
+
+    @Override
+    public Product getProductById(UUID id) {
+        log.info("Reading product from DB: "+id);
+        return productRepository.findByIdAndState(id,State.ACTIVE).orElse(null);
+    }
+
+    @Override
+    public Product createProduct(ProductDto productDto) {
+        Product product = productMapper.toEntity(productDto);
+        product.setCategory(findOrCreateCategory(product.getCategory()));
+        product.setCreatedAt(new Date());
+        product.setLastUpdatedAt(new Date());
+        product.setState(State.ACTIVE);
+        return productRepository.save(product);
+    }
+
+    @Override
+    public boolean deleteProductById(UUID id) {
+        Product product = productRepository.findById(id).orElse(null);
+        if(product==null) return false;
+        product.setState(State.INACTIVE);
+        product.setLastUpdatedAt(new Date());
+        productRepository.save(product);
+        return true;
+    }
+
+    @Override
+    public Product updateProduct(UUID id, ProductDto productDto) {
+        Product existing = productRepository.findByIdAndState(id, State.ACTIVE).orElse(null);
+        if (existing == null) {
+            return null;
+        }
+
+        productMapper.applyPatch(existing, productDto);
+
+        if (productDto.getCategory() != null && productDto.getCategory().getName() != null) {
+            Category category = new Category();
+            category.setName(productDto.getCategory().getName());
+            category.setDescription(productDto.getCategory().getDescription());
+            category.setState(State.ACTIVE);
+            existing.setCategory(findOrCreateCategory(category));
+        }
+
+        existing.setLastUpdatedAt(new Date());
+        return productRepository.save(existing);
+    }
+
+    private Category findOrCreateCategory(Category category) {
+        if (category == null) {
+            return null;
+        }
+
+        Optional<Category> existing = categoryRepo.findByName(category.getName());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Date now = new Date();
+        category.setId(null);
+        category.setCreatedAt(now);
+        category.setLastUpdatedAt(now);
+        return category;
+    }
+
+    public List<Product> getAllProducts() {
+        return productRepository.findAllProducts();
+    }
+
+    @Override
+    public Page<Product> getProductsInPriceRange(BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        if (minPrice == null && maxPrice == null) {
+            return productRepository.findAllByState(State.ACTIVE, pageable);
+        }
+
+        BigDecimal min = minPrice == null ? BigDecimal.ZERO : minPrice;
+        BigDecimal max = maxPrice == null ? new BigDecimal("1000000") : maxPrice;
+        return productRepository.findByPriceBetweenAndState(min, max, State.ACTIVE, pageable);
+    }
+}
